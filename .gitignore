@@ -7,3 +7,5 @@ mlruns/
 .pytest_cache/
 *.parquet
 !results/*.parquet
+
+ignore
