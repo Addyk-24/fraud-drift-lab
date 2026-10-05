@@ -323,10 +323,10 @@ Keep this list updated: **one line per meaningful change, newest first.** Figure
 
 | Name | Role |
 |---|---|
-| Aditya Katkar | Team Lead - simulator, baseline, drift detection, retraining policies, MLOps |
-| Member 2 | Data engineering, pipeline hardening, CI |
-| Member 3 | EDA, visualisation, SHAP, dashboard |
-| Member 4 | Preprocessing, imbalance, tuning, literature, report |
+| Aditya Katkar | Lead - simulator, baseline, drift detection, retraining policies, MLOps |
+| Om karkele | Data engineering, pipeline hardening, CI |
+| Kartik Mandane | EDA, visualisation, SHAP, dashboard |
+| Nikhil Kardile | Preprocessing, imbalance, tuning, literature, report |
 
 ## 8. References
 
