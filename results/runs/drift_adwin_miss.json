@@ -1,0 +1,14 @@
+{
+ "policy": "drift_adwin_miss",
+ "n_retrains": 1,
+ "retrain_windows": [
+  12
+ ],
+ "total_train_seconds": 60.83312773704529,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  11
+ ],
+ "spec": "drift:adwin_miss"
+}

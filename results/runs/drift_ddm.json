@@ -1,0 +1,20 @@
+{
+ "policy": "drift_ddm",
+ "n_retrains": 4,
+ "retrain_windows": [
+  17,
+  19,
+  21,
+  24
+ ],
+ "total_train_seconds": 270.9444274902344,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  16,
+  18,
+  20,
+  23
+ ],
+ "spec": "drift:ddm"
+}

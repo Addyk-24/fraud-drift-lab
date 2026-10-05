@@ -1,0 +1,13 @@
+{
+ "policy": "fixed_8w",
+ "n_retrains": 2,
+ "retrain_windows": [
+  16,
+  24
+ ],
+ "total_train_seconds": 118.64641189575195,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [],
+ "spec": "fixed:8"
+}

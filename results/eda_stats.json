@@ -1,0 +1,33 @@
+{
+  "n_transactions": 590540,
+  "n_fraud": 20663,
+  "fraud_rate_pct": 3.499,
+  "imbalance_ratio": 27.6,
+  "weekly_fraud_rate_pct_min": 2.074,
+  "weekly_fraud_rate_pct_max": 5.072,
+  "n_weeks": 26,
+  "columns_total": 424,
+  "columns_any_missing": 402,
+  "columns_over_50pct_missing": 202,
+  "fraud_rate_by_ProductCD_pct": {
+    "W": 2.04,
+    "C": 11.69,
+    "R": 3.78,
+    "H": 4.77,
+    "S": 5.9
+  },
+  "fraud_rate_with_identity_pct": 7.85,
+  "fraud_rate_without_identity_pct": 2.09,
+  "median_amount_legit": 68.5,
+  "median_amount_fraud": 75.0,
+  "mean_amount_legit": 134.51,
+  "mean_amount_fraud": 149.24,
+  "peak_fraud_hour": 7,
+  "top_correlated_features": {
+    "V257": 0.374,
+    "V244": 0.356,
+    "V246": 0.355,
+    "V242": 0.353,
+    "V201": 0.322
+  }
+}

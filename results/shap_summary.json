@@ -1,0 +1,45 @@
+{
+ "spearman_rank_corr_early_vs_late": 0.9950748494677417,
+ "spearman_p": 3.2575511619341925e-305,
+ "top10_overlap": 9,
+ "top10_early": [
+  "C1",
+  "C13",
+  "P_emaildomain",
+  "card6",
+  "card1",
+  "log_amt",
+  "TransactionAmt",
+  "C5",
+  "card2",
+  "id_31"
+ ],
+ "top10_late": [
+  "C1",
+  "C13",
+  "P_emaildomain",
+  "card6",
+  "card1",
+  "TransactionAmt",
+  "log_amt",
+  "C5",
+  "card2",
+  "amt_cents"
+ ],
+ "risers": {
+  "V285": 4,
+  "V133": 6,
+  "id_02": 8,
+  "M3": 8,
+  "D11": 16
+ },
+ "fallers": {
+  "id_31": -12,
+  "id_30": -10,
+  "R_emaildomain": -5,
+  "DeviceInfo": -4,
+  "id_33": -3
+ },
+ "top5_share_pct_early": 20.261448200624535,
+ "top5_share_pct_late": 19.352167770377108
+}

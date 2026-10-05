@@ -1,0 +1,75 @@
+{
+  "degradation_onset_window": 18,
+  "detectors": {
+    "ADWIN": {
+      "n_detections": 12,
+      "first_detection_window": 8,
+      "detection_windows": [
+        8,
+        9,
+        10,
+        13,
+        15,
+        17,
+        18,
+        19,
+        21,
+        22
+      ],
+      "delay_vs_onset_weeks": -10
+    },
+    "DDM": {
+      "n_detections": 16,
+      "first_detection_window": 8,
+      "detection_windows": [
+        8,
+        16,
+        17,
+        18,
+        25
+      ],
+      "delay_vs_onset_weeks": -10
+    },
+    "ADWIN-miss": {
+      "n_detections": 9,
+      "first_detection_window": 9,
+      "detection_windows": [
+        9,
+        11,
+        12,
+        15,
+        16,
+        18,
+        21,
+        24
+      ],
+      "delay_vs_onset_weeks": -9
+    },
+    "DDM-miss": {
+      "n_detections": 4,
+      "first_detection_window": 8,
+      "detection_windows": [
+        8,
+        9
+      ],
+      "delay_vs_onset_weeks": -10
+    }
+  },
+  "psi": {
+    "n_features_psi_over_0_25_in_last_window": 3,
+    "n_features_psi_over_0_10_in_last_window": 9,
+    "most_shifted_features": {
+      "id_31": 1.6943,
+      "id_30": 0.4371,
+      "D15": 0.2139,
+      "D10": 0.199,
+      "DeviceInfo": 0.1672
+    }
+  },
+  "adversarial_auc": {
+    "first_deployment_week": 0.7678960069444445,
+    "last_deployment_week": 0.9706538194444445,
+    "max": 0.9706538194444445
+  },
+  "corr_adversarial_auc_vs_pr_auc": -0.5085268590327607
+}

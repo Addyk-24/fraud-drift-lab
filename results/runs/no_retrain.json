@@ -1,0 +1,10 @@
+{
+ "policy": "no_retrain",
+ "n_retrains": 0,
+ "retrain_windows": [],
+ "total_train_seconds": 90.85934519767761,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [],
+ "spec": "no_retrain"
+}

@@ -1,0 +1,16 @@
+{
+ "policy": "drift_perf_drop",
+ "n_retrains": 2,
+ "retrain_windows": [
+  14,
+  19
+ ],
+ "total_train_seconds": 127.26276564598083,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  13,
+  18
+ ],
+ "spec": "drift:perf_drop"
+}

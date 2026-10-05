@@ -1,0 +1,15 @@
+{
+ "policy": "fixed_4w_delay14d",
+ "n_retrains": 4,
+ "retrain_windows": [
+  12,
+  16,
+  20,
+  24
+ ],
+ "total_train_seconds": 192.55928015708923,
+ "label_delay_days": 14,
+ "train_mode": "expanding",
+ "trigger_windows": [],
+ "spec": "fixed:4@14"
+}

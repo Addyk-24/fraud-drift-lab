@@ -1,0 +1,47 @@
+{
+  "transaction_shape": [
+    590540,
+    394
+  ],
+  "identity_shape": [
+    144233,
+    41
+  ],
+  "identity_coverage_pct": 24.42,
+  "merged_shape": [
+    590540,
+    435
+  ],
+  "memory_mb_after_downcast": 1126.3,
+  "duplicate_rows": 3,
+  "duplicate_transaction_ids": 0,
+  "columns_with_any_missing": 414,
+  "columns_over_50pct_missing": 214,
+  "columns_over_90pct_missing": 12,
+  "overall_missing_pct": 44.97,
+  "dropped_sparse_columns": [
+    "dist2",
+    "D7",
+    "id_07",
+    "id_08",
+    "id_18",
+    "id_21",
+    "id_22",
+    "id_23",
+    "id_24",
+    "id_25",
+    "id_26",
+    "id_27"
+  ],
+  "dropped_constant_columns": [],
+  "rows_dropped_duplicate_id": 0,
+  "final_shape": [
+    590540,
+    423
+  ],
+  "n_fraud": 20663,
+  "fraud_rate_pct": 3.499,
+  "time_span_days": 182.0,
+  "n_categorical_cols": 29,
+  "data_source": "real"
+}
