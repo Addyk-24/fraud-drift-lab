@@ -285,6 +285,32 @@ Top-10 late: C1, C13, P_emaildomain, card6, card1, TransactionAmt, log_amt, C5, 
 ![Feature effects in the last 3 weeks](results/figures/shap_beeswarm_late.png)
 *Feature effects in the last 3 weeks*
 
+### 8. Statistical comparison of policies
+
+Mean weekly PR-AUC gain over never retraining with a 95% moving-block bootstrap interval (block = 3 weeks, to respect autocorrelation) and Holm-corrected Wilcoxon p-values.
+
+| policy | n_retrains | mean_diff | ci_low | ci_high | weeks_better | n_weeks | wilcoxon_p_holm |
+|---|---|---|---|---|---|---|---|
+| fixed_2w | 8 | 0.0763 | 0.0581 | 0.1046 | 16 | 18 | 0.0035 |
+| fixed_4w | 4 | 0.0603 | 0.0350 | 0.0888 | 14 | 18 | 0.0049 |
+| fixed_8w | 2 | 0.0414 | 0.0123 | 0.0707 | 10 | 18 | 0.0101 |
+| drift_adwin_miss | 1 | 0.0269 | 0.0165 | 0.0425 | 14 | 18 | 0.0049 |
+| drift_ddm_miss | 3 | 0.0527 | 0.0424 | 0.0712 | 16 | 18 | 0.0035 |
+| drift_adwin | 4 | 0.0636 | 0.0421 | 0.0941 | 16 | 18 | 0.0035 |
+| drift_ddm | 4 | 0.0495 | 0.0117 | 0.0909 | 9 | 18 | 0.0101 |
+| drift_perf_drop | 2 | 0.0483 | 0.0214 | 0.0810 | 12 | 18 | 0.0067 |
+
+**Budget-matched: drift-triggered vs fixed interval with the same number of retrainings**
+
+| triggered | fixed | n_retrains | mean_diff | ci_low | ci_high | wilcoxon_p_holm |
+|---|---|---|---|---|---|---|
+| drift_adwin | fixed_4w | 4 | 0.0033 | -0.0114 | 0.0216 | 0.9721 |
+| drift_ddm | fixed_4w | 4 | -0.0108 | -0.0345 | 0.0076 | 0.5470 |
+| drift_perf_drop | fixed_8w | 2 | 0.0069 | -0.0087 | 0.0284 | 0.9604 |
+
+![Policy gains with uncertainty](results/figures/policy_forest.png)
+*Policy gains with uncertainty*
+
 
 <!-- RESULTS:END -->
 
@@ -296,19 +322,20 @@ Top-10 late: C1, C13, P_emaildomain, card6, card1, TransactionAmt, log_amt, C5, 
 |---|---|---|---|
 | Data download, merge, cleaning, quality report | Member 2 | done | CI, reproducibility docs |
 | EDA + feature-shift plots | Member 3 | done | - |
-| Encoding, feature selection, imbalance ablation, literature | Member 4 | done (literature review in progress) | tuning, sensitivity study, report |
+| Encoding, feature selection, imbalance ablation, literature | Member 4 | done (literature review in progress) | hyper-parameter search + sensitivity runs coded (`src/experiments.py`), need real-data run; literature table |
 | Chronological simulator, baseline, no-retrain decay | Aditya | done | - |
 | Preliminary ADWIN/DDM + PSI + adversarial drift | Aditya | done | - |
-| Drift-triggered retraining policy (ADWIN/DDM x error/miss stream, PR-AUC-drop rule) | Aditya | - | implemented; tune + sliding-window variant |
-| Cost model + break-even retrain cost + label-delay sensitivity | Aditya | - | implemented; justify constants in paper |
-| TreeSHAP explainability (early vs late, per week) | Member 3 | - | implemented; write interpretation |
-| Dashboard, tests, CI, Docker, MLflow logging | Aditya + Member 2 | dashboard ready for demo | deploy/share, extend tests |
-| Research paper | all (see `paper/`) | intro, related work, method, RQ1 drafted | RQ2-RQ4 results, discussion, polish |
+| Drift-triggered, hybrid and covariate (PSI) retraining policies, sliding window | Aditya | - | code + tests done; 11 policies run on real data, 7 new variants pending data re-download |
+| Cost model, break-even retrain cost, label-delay sensitivity, bootstrap CIs, budget-matched tests | Aditya | - | done (`src/cost.py`, `src/stats_tests.py`) |
+| TreeSHAP explainability (early vs late, per week) | Member 3 | - | done; interpretation written in paper |
+| Dashboard, tests (11), CI, Docker, MLflow logging | Aditya + Member 2 | dashboard ready | first CI run on GitHub, share dashboard |
+| Research paper | all (see `paper/`) | intro, related work, method, RQ1 | full draft incl. RQ1-RQ4, discussion, threats, conclusion; 8 TODO markers left (see paper/main.tex) |
 
 ## 6. Changelog
 
 Keep this list updated: **one line per meaningful change, newest first.** Figures and numbers are refreshed automatically above.
 
+- **2026-10-12** - End-Sem work: new policies (`HybridDrift` with maximum model age, label-free `CovariateDrift` on PSI of the top-20 features against the last four training weeks, sliding-window mode, longer cool-down), no-class-weight / tuned-parameter / 14-day-window sensitivity runs and random-search tuning with time-ordered validation (`src/experiments.py`), moving-block bootstrap CIs, Holm-corrected paired tests and budget-matched comparisons (`src/stats_tests.py`; result: all 8 policies beat never retraining, drift-triggered vs fixed at equal retrain count not distinguishable, every CI spans 0), dashboard sections for these, 4 new tests (11 total), paper sections completed. **Blocked:** `data/raw/train_identity.csv` and the cleaned Parquet were deleted from the working folder, so the 7 new policy runs and the sensitivity experiments have not been run on real data yet.
 - **2026-10-01** - Policy comparison and TreeSHAP run on real data (11 policies incl. label delay 7/14 days); paper RQ2-RQ4 results written. Findings: every retraining policy beats never retraining (PR-AUC +5.7% to +16.2%, paired Wilcoxon p<=0.008 except 14-day delay p=0.060); fixed 2-weekly is best and cheapest; drift-triggered policies only match fixed intervals at similar retrain counts (hypothesis H2 not supported); break-even retrain cost >= $17k vs assumed $500; SHAP ranking stable (rho=0.995) except browser/OS strings id_31/id_30. Docstrings and comments removed from all code (AST-verified identical); tests (7) and dashboard pages re-verified.
 - **2026-09-30 (later)** - End-Sem core pulled forward: `DriftTriggered` policy (increase-only ADWIN/DDM on error or fraud-miss streams, cool-down, detector reset after retrain, PR-AUC-drop rule), cost model with assumption-free break-even retrain cost, policy comparison with paired Wilcoxon tests and label-delay sensitivity, exact TreeSHAP early-vs-late analysis, Streamlit dashboard (live replay, drift, policies and cost calculator, explainability), 7 pytest guards (leakage, schedules, cost, end-to-end), GitHub Actions CI, Dockerfile, optional MLflow tracking. First real-data run: static split overstates PR-AUC vs deploy-once, never-retrained PR-AUC falls 13.7% (Spearman rho -0.49, p=0.039), adversarial AUC rises 0.77 -> 0.97.
 - **2026-09-30** - Mid-Sem code base created: Kaggle loader, cleaning pipeline, 9 EDA figures, time-safe feature selection, chronological

@@ -15,10 +15,13 @@
 
 \begin{abstract}
 Fraud-detection models are usually evaluated on a single static train/test split, which hides how they behave once deployed
-and fraud tactics change. We replay the IEEE-CIS Fraud Detection data chronologically in weekly windows, quantify how a model that
-is never retrained degrades, evaluate ADWIN and DDM as drift detectors, and compare three retraining policies---no retraining,
-fixed-interval and drift-triggered---on predictive performance and operational cost.
-\todo{one sentence per headline result: decay size, static-vs-deployment gap, best policy, cost saving}
+and fraud tactics change. We replay the IEEE-CIS Fraud Detection data (590{,}540 transactions, 26 weeks) chronologically in weekly
+windows, quantify how a model that is never retrained degrades, evaluate ADWIN and DDM as drift detectors, and compare no, fixed-interval and
+drift-triggered retraining on predictive performance and operational cost. A model trained once loses 13.7\% of its weekly PR-AUC over
+18 deployment weeks ($p=0.039$), and a random split overstates deployment PR-AUC by about one third. Input drift is much stronger than
+performance drift (adversarial AUC 0.77 to 0.97). Every retraining policy beats never retraining (+5.7\% to +16.2\% PR-AUC, significant after
+Holm correction), and retraining pays for itself unless a single retraining costs more than about \$17{,}000. Drift-triggered policies match,
+but at equal retraining effort do not measurably beat, fixed-interval retraining, and label delay erodes the benefit of retraining.
 \end{abstract}
 \begin{IEEEkeywords}
 fraud detection, concept drift, model retraining, MLOps, ADWIN, DDM, LightGBM
@@ -35,19 +38,27 @@ examine \emph{when} a deployed model should be retrained. We address this with a
 \item \textbf{RQ3} Which retraining policy gives the best performance-versus-cost trade-off?
 \item \textbf{RQ4} Which features drive predictions, and does their importance shift with drift?
 \end{itemize}
-\textbf{Contributions.} (i) A reproducible chronological-deployment benchmark on IEEE-CIS with an explicit label-delay option;
+\textbf{Contributions.} (i) A reproducible, leakage-controlled chronological-deployment benchmark on IEEE-CIS with an explicit label-delay option;
 (ii) a quantification of the gap between static-split and deployment-time performance; (iii) a cost-aware comparison of
-no, fixed-interval and drift-triggered retraining; (iv) an open-source MLOps pipeline coupling a drift detector to retraining.
-\todo{final contribution list once End-Sem results are in}
+no, fixed-interval, drift-triggered and hybrid retraining, with bootstrap confidence intervals, budget-matched comparisons and an assumption-free break-even
+retraining cost; (iv) an open-source, tested pipeline (simulator, policies, cost model, TreeSHAP analysis, dashboard, continuous integration).
 
 \section{Related Work}
-\textbf{Concept drift.} Gama et al.~\cite{gama2014survey} survey drift adaptation. DDM~\cite{gama2004ddm} monitors the online error rate and
-signals drift when it rises significantly above its historical minimum; ADWIN~\cite{bifet2007adwin} keeps an adaptive window and
-shrinks it when two sub-windows differ significantly.
+\textbf{Concept drift.} Gama et al.~\cite{gama2014survey} and Lu et al.~\cite{lu2019review} survey drift detection, understanding and adaptation.
+DDM~\cite{gama2004ddm} monitors the online error rate and signals drift when it rises significantly above its historical minimum;
+EDDM~\cite{baena2006eddm} extends it with the distance between errors; ADWIN~\cite{bifet2007adwin} keeps an adaptive window and
+shrinks it when two sub-windows differ significantly. \v{Z}liobait\.{e}~\cite{zliobaite2010delayed} studies how delayed labels affect
+when a change can be detected at all, which motivates our label-delay experiments.
+\textbf{Dataset shift detection.} Rabanser et al.~\cite{rabanser2019failing} compare label-free shift detectors, including classifier-based
+two-sample tests; our adversarial-validation AUC and PSI follow this family and require no labels.
 \textbf{Fraud detection under drift.} Dal Pozzolo et al.~\cite{dalpozzolo2018} show that supervised information in fraud detection arrives
-delayed, so feedback and delayed samples must be treated differently; Adebayo et al.~\cite{adebayo2023} review machine-learning and
-drift techniques for card fraud. \todo{2--3 more papers from the literature review (Member 4); compare on: dataset, drift handling, delay, cost}
-\textbf{Gap.} \todo{state precisely what prior work does not do: cost-aware comparison of retraining policies with label delay on IEEE-CIS}
+delayed, so feedback and delayed samples must be treated differently; Carcillo et al.~\cite{carcillo2018scarff} describe a scalable streaming framework for
+card-fraud detection; Adebayo et al.~\cite{adebayo2023} review machine-learning and drift techniques for card fraud.
+\textbf{ML operations.} Sculley et al.~\cite{sculley2015debt} identify monitoring and retraining as recurring maintenance costs of deployed
+models, which is the trade-off our cost model makes explicit.
+\textbf{Gap.} Prior work on fraud and drift typically proposes a detector or an adaptive learner and reports accuracy; we compare simple retraining
+\emph{policies} head to head on a public benchmark, on both performance and cost, under label delay, with uncertainty estimates.
+\todo{Member 4: confirm this gap statement against the full literature review (add 3--5 fraud-drift papers with dataset, drift handling, label delay and cost for a comparison table)}
 
 \section{Data and Problem Formulation}
 We use the IEEE-CIS Fraud Detection data~\cite{ieeecis}: transaction and identity tables joined on \texttt{TransactionID}; target
@@ -73,23 +84,36 @@ stored as categories with one global mapping (no target information). Missing va
 Highly correlated numeric features ($|r|>0.95$) are pruned using the initial training window only. Class imbalance is handled by
 class weighting; Section~\ref{sec:imb} compares it with undersampling and SMOTE~\cite{chawla2002smote}.
 \subsection{Model}
-LightGBM~\cite{ke2017lightgbm} is the main learner; XGBoost~\cite{chen2016xgboost} is used for comparison. \todo{final hyper-parameters (Member 4 tuning)}
+LightGBM~\cite{ke2017lightgbm} is the main learner; XGBoost~\cite{chen2016xgboost} is used for comparison. Default hyper-parameters: 300 trees, learning rate 0.05, 64 leaves, column subsample 0.5, row subsample 0.8,
+minimum 50 samples per leaf, L2 regularisation 1, and \texttt{scale\_pos\_weight} set to the class ratio of each training set.
+\todo{report the tuned parameters and the validation gain once the tuning run (src/experiments.py) has been executed}
 \subsection{Drift detection}
 ADWIN and DDM from River~\cite{montiel2021river} run over two binary streams of the never-retrained model: errors on all transactions, and misses on
 fraud transactions only (closer to production, where confirmed fraud arrives via chargebacks). Covariate shift is measured by the population stability index (PSI), the
 Kolmogorov--Smirnov statistic, and the AUC of an adversarial classifier separating the reference period from a later week.
 \subsection{Retraining policies}
-\emph{No retraining}; \emph{fixed interval} (retrain every $k$ windows); \emph{drift-triggered} (retrain when a detector fires).
-\todo{End-Sem: detector choice, cool-down, sliding vs expanding training window}
+\emph{No retraining} keeps the initial model. \emph{Fixed interval} retrains every $k$ weeks ($k\in\{2,4,8\}$) on all labelled data available at that time (expanding window).
+\emph{Drift-triggered} policies retrain at the start of the week after a trigger fires: ADWIN ($\delta=0.002$) or DDM on the stream of errors on all transactions,
+or on misses on fraud transactions only, or a rule that fires when weekly PR-AUC falls more than 15\% below the mean of the first three weeks after the last retraining.
+Because ADWIN also fires when the error \emph{decreases}, only increases count as drift. After every retraining the detector is reset, since the new model has a new error baseline,
+and a cool-down of two weeks separates consecutive triggers. A \emph{hybrid} policy additionally forces a retraining when the model is older than eight weeks.
+A label-free \emph{covariate} policy retrains when at least $k\in\{3,5,8\}$ of the 20 most important features exceed PSI~0.25 against the last four training weeks.
+\todo{results for the sliding-window, longer cool-down, hybrid and covariate variants: run src.policy_comparison on the real data (needs data/raw/train\_identity.csv)}
 \subsection{Cost model}
-\todo{End-Sem: $\text{Cost}= c_{FN}\sum \text{missed fraud amount} + c_{FP} N_{FP} + c_{R} N_{\text{retrains}}$, with justified constants and a sensitivity analysis}
+Total cost is $C=\ell\sum_{i\in\text{missed}}a_i + c_r\,N_{\text{flagged}} + c_t\,N_{\text{retrain}}$, where $a_i$ is the amount of a fraudulent transaction that the model did not flag,
+$\ell$ the share of it that is lost, $c_r$ the cost of reviewing one flagged transaction and $c_t$ the cost of one retraining.
+We assume $\ell=1$, $c_r=\$2$ and $c_t=\$500$ as illustrative values, not measurements, and therefore report (i) the sensitivity of the cheapest policy to $c_r$ and $c_t$
+(Fig.~\ref{fig:sens}) and (ii) the assumption-free \emph{break-even retraining cost}: the value of $c_t$ at which a policy costs the same as never retraining, $(C_{\text{never}}-C_{\text{policy}})/N_{\text{retrain}}$ evaluated at $c_t=0$.
 \subsection{Explainability}
-\todo{End-Sem: SHAP global importance per window; compare before/after drift}
+We explain the deployed model with exact TreeSHAP values~\cite{lundberg2017shap}, computed natively by LightGBM, on a weekly sample of 4{,}000 transactions that contains up to 1{,}000 frauds.
+Global importance is the mean absolute SHAP value; we compare the first and last three deployment weeks by rank correlation and by the change in rank of individual features.
 
 \section{Experimental Setup}
 Metrics: ROC-AUC, PR-AUC (primary, because of the severe class imbalance), recall at 1\% false-positive rate, and threshold metrics (precision, recall, F1).
-\todo{hardware, software versions, random seed, run time}
-
+Metrics are computed per deployment week and averaged. Uncertainty is estimated with a moving-block bootstrap over weeks (blocks of three weeks, 5{,}000 resamples)
+and paired Wilcoxon signed-rank tests on weekly differences, with Holm correction across policies.
+All experiments use Python 3.11, LightGBM 4.7.0, XGBoost 3.2.0, scikit-learn 1.9.1, River 0.26.1, pandas 3.0.5 and NumPy 2.4.6, with random seed 42, on a laptop with a 12-core Intel Core i7-1360P and 15.7 GB of RAM.
+Each retraining of the LightGBM model on up to 8--26 weeks of data takes tens of seconds; training of all eleven main policies totalled about 37 minutes.
 \section{Results}
 \subsection{RQ1: degradation without retraining}
 Trained on the first 8 weeks and never updated, the LightGBM model's weekly PR-AUC falls from 0.546 (mean of the first three
@@ -116,14 +140,14 @@ the AUC of an adversarial classifier separating the training period from week $w
 important features exceed PSI 0.25 by the last week, and the most shifted feature is the browser version \texttt{id\_31} (PSI 1.69).
 Drift in the inputs is therefore much clearer than drift in performance, which only declines moderately (Section~RQ1).
 \subsection{RQ3: retraining policies}
-Table~\ref{tab:pol} compares the policies over the 18 deployment weeks. Every retraining policy improves on never retraining
-(paired Wilcoxon on weekly PR-AUC, $p\le0.008$ for all but the 14-day label-delay variant). Performance rises with retraining frequency:
-fixed 2-weekly retraining gives the best mean PR-AUC (0.546, +16.2\%), followed by 4-weekly (0.530, +12.8\%) and 8-weekly (0.511, +8.8\%).
-Drift-triggered retraining did \emph{not} beat fixed intervals at a comparable number of retrainings: ADWIN on the error stream retrained four
-times and reached 0.534, matching fixed 4-weekly retraining (0.530), and DDM on fraud misses reached 0.523 with three retrainings versus 0.511 for
-two fixed retrainings. We therefore do not find support for the hypothesis that drift triggers retrain more efficiently than a well-chosen fixed interval on this data.
-Under the default cost assumptions all retraining policies are cheaper than never retraining (by 3.7\% to 16.2\%); the saving is driven by fraud
-losses, not by retraining effort. The break-even retraining cost, i.e.\ the price per retraining at which a policy stops paying for itself, is
+Table~\ref{tab:pol} compares the policies over the 18 deployment weeks. Every retraining policy improves on never retraining; the 95\% block-bootstrap interval of the
+mean weekly PR-AUC gain excludes zero for all eight policies and all remain significant after Holm correction (Fig.~\ref{fig:forest}). Performance rises with retraining frequency:
+fixed 2-weekly retraining gives the best mean PR-AUC (0.546, +16.2\%), followed by 4-weekly (0.530, +12.8\%) and 8-weekly (0.511, +8.8\%), with diminishing returns:
+at the assumed prices, moving from 8-weekly to 4-weekly retraining saves about \$17.7k of fraud and review cost for \$1.0k of extra retraining, whereas moving from 4-weekly to 2-weekly saves about \$3.9k for \$2.0k.
+Drift-triggered policies sit on the same performance-versus-effort frontier as fixed intervals rather than above it. In budget-matched comparisons with an equal number of retrainings,
+ADWIN on errors versus fixed 4-weekly differs by $+0.003$ PR-AUC (95\% CI $[-0.011,0.022]$), DDM on errors versus fixed 4-weekly by $-0.011$ ($[-0.035,0.008]$), and the PR-AUC-drop rule versus fixed 8-weekly by $+0.007$ ($[-0.009,0.028]$):
+all intervals contain zero, so with 18 weeks of data we find no evidence that drift triggers retrain more efficiently than a well-chosen fixed interval, and no evidence that they are worse.
+Under the default cost assumptions all retraining policies are cheaper than never retraining (by 3.7\% to 16.2\%); the saving comes from fraud losses, not from retraining effort. The break-even retraining cost is
 at least \$17k for every policy against an assumed \$500, so retraining pays off under any plausible price. Label delay erodes the benefit:
 for 4-weekly retraining the mean PR-AUC falls from 0.530 (no delay) to 0.516 (7 days) and 0.496 (14 days, $p=0.060$ against never retraining).
 Results come from a single run on one dataset, so differences of a few percent between policies should not be over-interpreted.
@@ -135,20 +159,37 @@ Fixed 8 weeks & 2 & 0.511 & +8.8\% & 14.9\%\\ ADWIN (errors) & 4 & 0.534 & +13.5
 DDM (errors) & 4 & 0.520 & +10.5\% & 10.1\%\\ DDM (misses) & 3 & 0.523 & +11.2\% & 10.8\%\\ PR-AUC drop rule & 2 & 0.518 & +10.3\% & 12.2\%\\
 \bottomrule\end{tabular}\end{table}
 \begin{figure}[t]\centering\safefig{policy_tradeoff}{\columnwidth}{tradeoff}\caption{Performance versus retraining effort, and cost breakdown per policy.}\end{figure}
+\begin{figure}[t]\centering\safefig{policy_forest}{\columnwidth}{forest}\caption{Gain in mean weekly PR-AUC over never retraining with 95\% block-bootstrap intervals.}\label{fig:forest}\end{figure}
+\begin{figure}[t]\centering\safefig{cost_sensitivity}{\columnwidth}{sens}\caption{Cheapest policy under different review and retraining prices.}\label{fig:sens}\end{figure}
 \subsection{RQ4: explainability}
 Exact TreeSHAP values of the deployed model show a \emph{stable} reliance on the same signals: the importance ranking of the first and
 last three deployment weeks is almost identical (Spearman $\rho=0.995$, 9 of the top-10 features shared). The notable exceptions are the
 identity strings \texttt{id\_31} and \texttt{id\_30} (browser and operating-system versions), which lose 12 and 10 rank positions. They are also
 the most shifted features by PSI (\texttt{id\_31}: 1.69), which suggests that new browser/OS versions unseen in training erode
-a useful signal rather than the model's logic changing. \todo{interpretation of risers (D11, id\_02, M3) once confirmed}
+a useful signal rather than the model's logic changing. The features that gain rank (\texttt{D11}, \texttt{id\_02}, \texttt{M3}) are anonymised by the dataset owner, so we do not attempt a business interpretation.
+
 
 \section{Discussion}
-\todo{Implications for practitioners; covariate vs concept drift; effect of label delay}
+\textbf{Input drift is not the same as performance drift.} The inputs drift strongly (adversarial AUC 0.97 by the last week) while PR-AUC declines only moderately and the model's feature
+reliance is stable. A monitor based on input shift alone would therefore fire long before retraining is worth its cost, and error-based detectors fire too early on a never-retrained
+model with only 3.5\% positives. This explains why drift-triggered policies did not improve on fixed schedules in our budget-matched comparisons.
+\textbf{Practical guidance.} A fixed interval of about four weeks is a strong, simple default: it captured most of the gain of 2-weekly retraining at half the retraining effort.
+Drift monitors are most useful as a safety net for abrupt changes, for instance in a hybrid policy with a maximum model age.
+\textbf{Label delay matters.} Fraud labels arrive late; at a 14-day delay the benefit of 4-weekly retraining shrinks from +12.8\% to +5.6\% and is no longer significant at the 5\% level, so retraining schedules should be set with the labelling delay in mind.
+\textbf{Retraining adds data as well as recency.} With an expanding window a retrained model sees more data \emph{and} more recent data; part of the gain may be the former.
+\todo{separate the two effects with the sliding-window results once the real-data run is available}
+
 \section{Threats to Validity}
-Single dataset; \texttt{TransactionDT} has no calendar dates, so seasonality cannot be identified; anonymised features limit interpretability;
-cost constants are assumptions; detector hyper-parameters may favour one method. \todo{add after experiments}
+\emph{External:} a single dataset covering six months, without calendar dates, so seasonality cannot be identified; the features are anonymised, which limits interpretation. \emph{Internal:} one model family and one random seed, so no variance over training randomness is reported;
+the decision threshold is tuned on one week; detector parameters were fixed a priori but may favour one method; the cost constants are assumptions, which is why we report sensitivity and break-even values; 18 deployment weeks give limited power to separate policies
+whose gains differ by a few percent; the early deployment weeks follow the training period closely and the series is autocorrelated, which we address with block bootstrap but not eliminate.
+\emph{Construct:} PR-AUC averaged over weeks weights each week equally regardless of its fraud count.
+
 \section{Conclusion}
-\todo{3--4 sentences answering RQ1--RQ4}
+A fraud model trained once degrades measurably but moderately under chronological deployment (13.7\% lower weekly PR-AUC after 18 weeks), and static splits overstate its performance by about one third (RQ1).
+Raw ADWIN and DDM alarms on the error stream are early and frequent, whereas covariate drift is large and monotone, so detector alarms alone are a poor guide (RQ2).
+Every retraining policy beats never retraining and pays for itself at any plausible retraining price; the more frequent the retraining the better, with diminishing returns, and drift-triggered policies match but do not measurably beat fixed intervals at equal effort (RQ3).
+The deployed model relies on the same features throughout, except browser and operating-system strings whose values drift (RQ4).
 
 \section*{Acknowledgment}
 We thank Dr.~Kapil Vhatkar for guidance.
