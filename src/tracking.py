@@ -2,14 +2,11 @@ from pathlib import Path
 
 from src import config
 
-try:
-    import mlflow
-except ImportError:
-    mlflow = None
-
 
 def log_policy_run(name: str, params: dict, metrics: dict, artifacts=()):
-    if mlflow is None:
+    try:
+        import mlflow
+    except ImportError:
         return
     mlflow.set_tracking_uri((config.ROOT / "mlruns").as_uri())
     mlflow.set_experiment("retraining-policies")

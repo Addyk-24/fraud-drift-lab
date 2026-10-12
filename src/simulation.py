@@ -8,6 +8,7 @@ from sklearn.metrics import (average_precision_score, f1_score, precision_score,
                              roc_auc_score, roc_curve)
 
 from src import config
+from src.driftstats import psi
 from src.features import add_time_features, candidate_features, select_features
 
 
@@ -22,13 +23,15 @@ def prepare_data(df: pd.DataFrame, window_days=config.WINDOW_DAYS,
     info = {"n_candidate_features": len(cols), "n_selected_features": len(kept),
             "n_dropped_correlated": len(dropped), "n_windows": int(df["window"].max()) + 1,
             "window_days": window_days, "initial_train_windows": initial_windows}
+    df.attrs["window_days"] = window_days
     return df, kept, info
 
 
-def fit_model(X, y, params=None):
+def fit_model(X, y, params=None, class_weight=True):
     params = dict(params or config.LGBM_PARAMS)
-    pos = max(int(y.sum()), 1)
-    params["scale_pos_weight"] = (len(y) - pos) / pos
+    if class_weight:
+        pos = max(int(y.sum()), 1)
+        params["scale_pos_weight"] = (len(y) - pos) / pos
     return lgb.LGBMClassifier(**params).fit(X, y)
 
 
@@ -67,6 +70,11 @@ class Policy:
     def observe(self, w: int, y, pred, proba):
         pass
 
+    def observe_data(self, w: int, cur):
+        pass
+
+    def on_train(self, train, model, cols):
+        pass
 
     def notify_retrained(self, w: int):
         pass
@@ -150,9 +158,57 @@ class DriftTriggered(Policy):
                     return
 
 
+class HybridDrift(DriftTriggered):
+
+    def __init__(self, detector="adwin", max_age=8, **kw):
+        super().__init__(detector=detector, **kw)
+        self.max_age = max_age
+        self.name = f"hybrid_{detector}_max{max_age}"
+
+    def should_retrain(self, w, first_deploy):
+        flag, self._flag = self._flag, False
+        if flag:
+            return True
+        if self._age >= self.max_age:
+            self.triggers.append(w)
+            return True
+        return False
+
+
+class CovariateDrift(Policy):
+
+    def __init__(self, min_features=3, psi_threshold=0.25, top_n=20, ref_windows=4, cooldown=2):
+        self.min_features, self.psi_threshold = min_features, psi_threshold
+        self.top_n, self.ref_windows, self.cooldown = top_n, ref_windows, cooldown
+        self.name = f"drift_psi{min_features}"
+        self.triggers, self._flag, self._age = [], False, 0
+        self._ref, self._feats = None, []
+
+    def on_train(self, train, model, cols):
+        gain = pd.Series(model.booster_.feature_importance("gain"), index=cols)
+        self._feats = list(gain.nlargest(self.top_n).index)
+        last = train["window"].max()
+        self._ref = train[train["window"] > last - self.ref_windows][self._feats]
+        self._age = 0
+
+    def should_retrain(self, w, first_deploy):
+        flag, self._flag = self._flag, False
+        return flag
+
+    def observe_data(self, w, cur):
+        self._age += 1
+        if self._ref is None:
+            return
+        n_shifted = sum(psi(self._ref[f], cur[f]) > self.psi_threshold for f in self._feats)
+        if n_shifted >= self.min_features and self._age >= self.cooldown:
+            self._flag = True
+            self.triggers.append(w)
+
+
 def training_slice(df, w, delay_days, mode="expanding", sliding_windows=8):
     t0 = df[config.TIME_COL].min()
-    w_start = t0 + w * config.WINDOW_DAYS * config.SECONDS_PER_DAY
+    window_days = df.attrs.get("window_days", config.WINDOW_DAYS)
+    w_start = t0 + w * window_days * config.SECONDS_PER_DAY
     known = df[config.TIME_COL] <= (w_start - delay_days * config.SECONDS_PER_DAY)
     m = known & (df["window"] < w)
     if mode == "sliding":
@@ -160,20 +216,23 @@ def training_slice(df, w, delay_days, mode="expanding", sliding_windows=8):
     return df[m]
 
 
-def train_with_threshold(train, cols):
+def train_with_threshold(train, cols, params=None, class_weight=True):
     last = train["window"].max()
     fit_df, val_df = train[train["window"] < last], train[train["window"] == last]
-    model = fit_model(fit_df[cols], fit_df[config.TARGET])
+    model = fit_model(fit_df[cols], fit_df[config.TARGET], params, class_weight)
     thr = best_f1_threshold(val_df[config.TARGET].values, model.predict_proba(val_df[cols])[:, 1])
     return model, thr
 
 
 def run_simulation(df, cols, policy: Policy, initial_windows=config.INITIAL_TRAIN_WINDOWS,
-                   delay_days=config.LABEL_DELAY_DAYS, mode="expanding", verbose=True):
+                   delay_days=config.LABEL_DELAY_DAYS, mode="expanding", verbose=True,
+                   params=None, class_weight=True):
     n_win = int(df["window"].max()) + 1
     first_deploy = initial_windows
     t = time.time()
-    model, thr = train_with_threshold(training_slice(df, first_deploy, delay_days, mode), cols)
+    train0 = training_slice(df, first_deploy, delay_days, mode)
+    model, thr = train_with_threshold(train0, cols, params, class_weight)
+    policy.on_train(train0, model, cols)
     train_secs = [time.time() - t]
     retrain_at = [first_deploy]
     rows, stream = [], []
@@ -181,11 +240,13 @@ def run_simulation(df, cols, policy: Policy, initial_windows=config.INITIAL_TRAI
     for w in range(first_deploy, n_win):
         if policy.should_retrain(w, first_deploy):
             t = time.time()
-            model, thr = train_with_threshold(training_slice(df, w, delay_days, mode), cols)
+            trainw = training_slice(df, w, delay_days, mode)
+            model, thr = train_with_threshold(trainw, cols, params, class_weight)
             train_secs.append(time.time() - t)
             retrain_at.append(w)
             policy.notify_retrained(w)
-        cur =df[df["window"] == w]
+            policy.on_train(trainw, model, cols)
+        cur = df[df["window"] == w]
         if len(cur) == 0:
             continue
         y = cur[config.TARGET].values
@@ -196,6 +257,7 @@ def run_simulation(df, cols, policy: Policy, initial_windows=config.INITIAL_TRAI
                  threshold=thr)
         rows.append(m)
         policy.observe(w, y, proba >= thr, proba)
+        policy.observe_data(w, cur)
         stream.append(pd.DataFrame({"window": w, "TransactionDT": cur[config.TIME_COL].values, "y": y,
                                     "proba": proba, "pred": (proba >= thr).astype("int8"),
                                     "amount": amt if amt is not None else np.nan}))
