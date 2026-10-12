@@ -7,7 +7,8 @@ from scipy import stats
 
 from src import config, cost, tracking, viz
 from src.baseline import decay_statistics
-from src.simulation import DriftTriggered, FixedInterval, NoRetrain, prepare_data, run_simulation
+from src.simulation import (CovariateDrift, DriftTriggered, FixedInterval, HybridDrift, NoRetrain, prepare_data,
+                            run_simulation)
 
 plt = viz.plt
 C = viz.COLORS
@@ -16,23 +17,39 @@ DEFAULT_SPECS = ["no_retrain", "fixed:2", "fixed:4", "fixed:8",
                  "drift:adwin_miss", "drift:ddm_miss", "drift:adwin", "drift:ddm", "drift:perf_drop",
                  "fixed:4@7", "fixed:4@14"]
 
+EXTRA_SPECS = ["fixed:4#sliding", "drift:adwin:cd4", "hybrid:adwin:8", "hybrid:ddm_miss:8",
+               "drift:psi3", "drift:psi5", "drift:psi8"]
+
 
 def make_policy(spec: str):
-    delay = 0
+    delay, mode = 0, "expanding"
+    if "#sliding" in spec:
+        spec, mode = spec.replace("#sliding", ""), "sliding"
     if "@" in spec:
         spec, d = spec.split("@")
         delay = int(d)
-    if spec == "no_retrain":
+    parts = spec.split(":")
+    kind = parts[0]
+    if kind == "no_retrain":
         pol = NoRetrain()
-    elif spec.startswith("fixed:"):
-        pol = FixedInterval(int(spec.split(":")[1]))
-    elif spec.startswith("drift:"):
-        pol = DriftTriggered(detector=spec.split(":")[1])
+    elif kind == "fixed":
+        pol = FixedInterval(int(parts[1]))
+    elif kind == "drift" and parts[1].startswith("psi"):
+        pol = CovariateDrift(min_features=int(parts[1][3:]))
+    elif kind == "drift":
+        cd = int(parts[2][2:]) if len(parts) > 2 and parts[2].startswith("cd") else 2
+        pol = DriftTriggered(detector=parts[1], cooldown=cd)
+        if cd != 2:
+            pol.name = f"{pol.name}_cd{cd}"
+    elif kind == "hybrid":
+        pol = HybridDrift(detector=parts[1], max_age=int(parts[2]))
     else:
         raise ValueError(spec)
+    if mode == "sliding":
+        pol.name = f"{pol.name}_sliding"
     if delay:
         pol.name = f"{pol.name}_delay{delay}d"
-    return pol, delay
+    return pol, delay, mode
 
 
 def run_all(specs, force=False):
@@ -43,13 +60,13 @@ def run_all(specs, force=False):
     df, cols, info = prepare_data(df)
     out = {}
     for spec in specs:
-        pol, delay = make_policy(spec)
+        pol, delay, mode = make_policy(spec)
         jf = runs_dir / f"{pol.name}.json"
         if jf.exists() and not force and (config.TABLE_DIR / f"window_metrics_{pol.name}.csv").exists():
             print(f"[cached] {pol.name}")
             out[pol.name] = json.loads(jf.read_text())
             continue
-        res, pinfo, stream, _ = run_simulation(df, cols, pol, delay_days=delay, verbose=False)
+        res, pinfo, stream, _ = run_simulation(df, cols, pol, delay_days=delay, mode=mode, verbose=False)
         res.to_csv(config.TABLE_DIR / f"window_metrics_{pol.name}.csv", index=False)
         stream.to_parquet(config.RESULTS_DIR / f"stream_{pol.name}.parquet", index=False)
         pinfo["spec"] = spec
@@ -108,7 +125,7 @@ def summarise(runs: dict) -> pd.DataFrame:
 
 def make_figures(tab: pd.DataFrame, runs: dict):
     main = tab[tab.label_delay_days == 0].copy()
-    drift = main[main.policy.str.startswith("drift_")]
+    drift = main[main.policy.str.startswith(("drift_", "hybrid_"))]
     best_drift = drift.sort_values("mean_pr_auc", ascending=False).policy.iloc[0] if len(drift) else None
     show = [p for p in ("no_retrain", "fixed_4w", best_drift) if p]
     colors = {"no_retrain": C["red"], "fixed_4w": C["blue"], best_drift: C["green"]}
@@ -125,7 +142,7 @@ def make_figures(tab: pd.DataFrame, runs: dict):
 
     fig, ax = plt.subplots(1, 2, figsize=(12, 4))
     for _, r in main.iterrows():
-        col = C["green"] if r.policy.startswith("drift_") else C["blue"] if r.policy.startswith("fixed") else C["red"]
+        col = C["green"] if r.policy.startswith(("drift_", "hybrid_")) else C["blue"] if r.policy.startswith("fixed") else C["red"]
         ax[0].scatter(r.n_retrains, r.mean_pr_auc, s=70, color=col)
         ax[0].annotate(r.policy.replace("drift_", "d:"), (r.n_retrains, r.mean_pr_auc), fontsize=8,
                        xytext=(4, 4), textcoords="offset points")
@@ -153,20 +170,20 @@ def make_figures(tab: pd.DataFrame, runs: dict):
         for j, k in enumerate(rc):
             grid[i, j] = int(np.argmin([cost.total_cost(comps[p], r, k)["total"] for p in names]))
     fig, ax = plt.subplots(figsize=(9, 3.8))
-    im = ax.imshow(grid, aspect="auto", cmap="tab10", vmin=0, vmax=9, origin="lower")
+    im = ax.imshow(grid, aspect="auto", cmap="tab20", vmin=0, vmax=19, origin="lower")
     ax.set_xticks(range(0, len(rc), 4)); ax.set_xticklabels([f"{rc[k]:,.0f}" for k in range(0, len(rc), 4)])
     ax.set_yticks(range(len(rv))); ax.set_yticklabels([f"${r}" for r in rv]); ax.grid(False)
     ax.set_xlabel("Cost of ONE retraining ($)"); ax.set_ylabel("Review cost per flagged txn")
     used = sorted(set(grid.ravel()))
     ax.set_title("Cheapest policy under different cost assumptions")
-    handles = [plt.Rectangle((0, 0), 1, 1, color=plt.get_cmap("tab10")(u / 9)) for u in used]
+    handles = [plt.Rectangle((0, 0), 1, 1, color=plt.get_cmap("tab20")(u / 19)) for u in used]
     ax.legend(handles, [names[u] for u in used], bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8)
     viz.save(fig, "cost_sensitivity")
     return best_drift
 
 
 def main(specs=None, force=False):
-    runs = run_all(specs or DEFAULT_SPECS, force)
+    runs = run_all(specs or (DEFAULT_SPECS + EXTRA_SPECS), force)
     tab = summarise(runs)
     tab.to_csv(config.RESULTS_DIR / "policy_comparison.csv", index=False)
     log_to_mlflow(tab, runs)
