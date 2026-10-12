@@ -1,0 +1,45 @@
+{
+ "n_boot": 5000,
+ "block": 3,
+ "all_significant_after_holm": true,
+ "n_policies": 8,
+ "n_significant": 8,
+ "matched_budget_pairs": [
+  {
+   "mean_diff": 0.0033,
+   "ci_low": -0.0114,
+   "ci_high": 0.0216,
+   "wilcoxon_p": 0.9721,
+   "weeks_better": 4,
+   "n_weeks": 18,
+   "triggered": "drift_adwin",
+   "fixed": "fixed_4w",
+   "n_retrains": 4,
+   "wilcoxon_p_holm": 0.9721
+  },
+  {
+   "mean_diff": -0.0108,
+   "ci_low": -0.0345,
+   "ci_high": 0.0076,
+   "wilcoxon_p": 0.1823,
+   "weeks_better": 5,
+   "n_weeks": 18,
+   "triggered": "drift_ddm",
+   "fixed": "fixed_4w",
+   "n_retrains": 4,
+   "wilcoxon_p_holm": 0.547
+  },
+  {
+   "mean_diff": 0.0069,
+   "ci_low": -0.0087,
+   "ci_high": 0.0284,
+   "wilcoxon_p": 0.4802,
+   "weeks_better": 7,
+   "n_weeks": 18,
+   "triggered": "drift_perf_drop",
+   "fixed": "fixed_8w",
+   "n_retrains": 2,
+   "wilcoxon_p_holm": 0.9604
+  }
+ ]
+}
