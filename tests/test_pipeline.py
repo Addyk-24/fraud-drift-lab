@@ -75,3 +75,60 @@ def test_end_to_end_small(prepared):
     assert rinfo2["retrain_windows"] == [12, 16, 20, 24]
     a, b = res.set_index("window"), res2.set_index("window")
     assert np.allclose(a.loc[8:11, "roc_auc"], b.loc[8:11, "roc_auc"], equal_nan=True)
+
+
+def test_hybrid_forces_retrain_after_max_age():
+    from src.simulation import HybridDrift
+    pol = HybridDrift("adwin_miss", max_age=3, cooldown=0)
+    y = np.ones(500, dtype=int)
+    stable = np.ones(500, dtype=int)
+    fired = []
+    for w in range(8, 20):
+        if pol.should_retrain(w, 8):
+            fired.append(w)
+            pol.notify_retrained(w)
+        pol.observe(w, y, stable, None)
+    assert fired == [11, 14, 17]
+
+
+class _StubBooster:
+    def feature_importance(self, kind):
+        return np.array([5.0, 4.0, 1.0])
+
+
+class _StubModel:
+    booster_ = _StubBooster()
+
+
+def test_covariate_policy_triggers_on_shift_not_on_stable_data():
+    from src.simulation import CovariateDrift
+    rng = np.random.default_rng(1)
+    cols = ["a", "b", "c"]
+    train = pd.DataFrame({c: rng.normal(size=4000) for c in cols})
+    train["window"] = np.repeat(np.arange(8), 500)
+    pol = CovariateDrift(min_features=2, top_n=2, cooldown=0)
+    pol.on_train(train, _StubModel(), cols)
+    stable = pd.DataFrame({c: rng.normal(size=2000) for c in cols})
+    pol.observe_data(8, stable)
+    assert not pol.should_retrain(9, 8)
+    shifted = pd.DataFrame({"a": rng.normal(3, 1, 2000), "b": rng.normal(3, 1, 2000), "c": rng.normal(size=2000)})
+    pol.observe_data(9, shifted)
+    assert pol.should_retrain(10, 8) is True
+
+
+def test_policy_spec_parser():
+    from src.policy_comparison import make_policy
+    pol, delay, mode = make_policy("fixed:4#sliding")
+    assert (pol.name, delay, mode) == ("fixed_4w_sliding", 0, "sliding")
+    pol, delay, mode = make_policy("fixed:4@14")
+    assert (pol.name, delay, mode) == ("fixed_4w_delay14d", 14, "expanding")
+    assert make_policy("hybrid:adwin:8")[0].name == "hybrid_adwin_max8"
+    assert make_policy("drift:psi5")[0].min_features == 5
+    assert make_policy("drift:adwin:cd4")[0].cooldown == 4
+
+
+def test_holm_correction_is_monotone_and_bounded():
+    from src.stats_tests import holm
+    adj = holm([0.01, 0.04, 0.03])
+    assert np.allclose(adj, [0.03, 0.06, 0.06])
+    assert (adj <= 1).all()

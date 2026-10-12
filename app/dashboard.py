@@ -314,6 +314,26 @@ elif page == PAGES[4]:
                "It does not depend on the cost assumptions you chose, only on review cost and loss share. "
                "Wilcoxon p compares per-week PR-AUC against never retraining (paired by week).")
     show_fig("policy_timeline"); show_fig("cost_sensitivity")
+    vs = csv("policy_stats_vs_no_retrain.csv")
+    if vs is not None:
+        st.subheader("How sure are we? Gains with confidence intervals")
+        a, b = st.columns([3, 2])
+        with a:
+            show_fig("policy_forest")
+        with b:
+            mb = csv("policy_stats_matched_budget.csv")
+            st.markdown("**Drift-triggered vs fixed interval, same number of retrainings**")
+            if mb is not None and len(mb):
+                st.dataframe(mb[["triggered", "fixed", "n_retrains", "mean_diff", "ci_low", "ci_high"]].round(3),
+                             hide_index=True, width="stretch")
+                st.caption("Every interval contains 0: at equal retraining effort we cannot tell drift-triggered from fixed-interval retraining.")
+            st.caption(f"{int(vs.significant_holm_5pct.sum())} of {len(vs)} policies beat never retraining after Holm correction.")
+    ex = csv("extra_experiments.csv")
+    if ex is not None:
+        st.subheader("Do the conclusions survive other design choices?")
+        st.dataframe(ex[["group", "variant", "policy", "mean_pr_auc", "n_retrains", "pr_auc_gain_pct", "cost_saving_pct"]].round(3),
+                     hide_index=True, width="stretch")
+        show_fig("extra_experiments")
     d = pc[pc.policy.str.contains("delay") | (pc.policy == "fixed_4w")]
     if len(d) > 1:
         st.subheader("Label-delay sensitivity (fixed 4-week retraining)")

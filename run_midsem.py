@@ -1,11 +1,11 @@
 import argparse
 import time
 
-from src import (baseline, config, data_download, drift_analysis, eda, explain, imbalance_ablation, make_dataset,
-                 policy_comparison)
+from src import (baseline, config, data_download, drift_analysis, eda, experiments, explain, imbalance_ablation,
+                 make_dataset, policy_comparison, stats_tests)
 
-STEPS = ["download", "clean", "eda", "baseline", "imbalance", "drift", "policies", "explain", "readme"]
-DEFAULT_STEPS = [s for s in STEPS if s not in ("policies", "explain")]
+STEPS = ["download", "clean", "eda", "baseline", "imbalance", "drift", "policies", "explain", "extras", "stats", "readme"]
+DEFAULT_STEPS = [s for s in STEPS if s not in ("policies", "explain", "extras", "stats")]
 
 
 def main():
@@ -32,6 +32,8 @@ def main():
     run("drift", drift_analysis.main)
     run("policies", policy_comparison.main)
     run("explain", explain.main)
+    run("extras", experiments.main)
+    run("stats", stats_tests.main)
     if "readme" in steps:
         import sys
         from src import make_readme

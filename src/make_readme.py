@@ -21,6 +21,11 @@ def load_csv(name):
     return pd.read_csv(p) if p.exists() else None
 
 
+def load_csv_path(name):
+    p = config.RESULTS_DIR / name
+    return pd.read_csv(p) if p.exists() else None
+
+
 def md_table(df, floatfmt="{:.4f}"):
     if df is None or df.empty:
         return "_not generated yet_\n"
@@ -180,6 +185,35 @@ def build(readme_dir) -> str:
         for n, c in (("shap_global_top15", "Mean |SHAP|, early vs late"), ("shap_weekly_heatmap", "Share of |SHAP| over time"),
                      ("shap_beeswarm_late", "Feature effects in the last 3 weeks")):
             s.append(fig(readme_dir, n, c))
+
+    nl = chr(10)
+    vs = load_csv_path("policy_stats_vs_no_retrain.csv")
+    if vs is not None:
+        s.append("### 8. Statistical comparison of policies" + nl)
+        s.append("Mean weekly PR-AUC gain over never retraining with a 95% moving-block bootstrap interval (block = 3 weeks, "
+                 "to respect autocorrelation) and Holm-corrected Wilcoxon p-values." + nl + nl)
+        t = vs[["policy", "n_retrains", "mean_diff", "ci_low", "ci_high", "weeks_better", "n_weeks", "wilcoxon_p_holm"]]
+        s.append(md_table(t.round(4), floatfmt="{:.4f}"))
+        pairs = load_csv_path("policy_stats_matched_budget.csv")
+        if pairs is not None and len(pairs):
+            s.append(nl + "**Budget-matched: drift-triggered vs fixed interval with the same number of retrainings**" + nl + nl)
+            s.append(md_table(pairs[["triggered", "fixed", "n_retrains", "mean_diff", "ci_low", "ci_high", "wilcoxon_p_holm"]].round(4),
+                              floatfmt="{:.4f}"))
+        s.append(nl + fig(readme_dir, "policy_forest", "Policy gains with uncertainty"))
+
+    ex = load_csv_path("extra_experiments.csv")
+    if ex is not None:
+        s.append("### 9. Sensitivity experiments" + nl)
+        t = ex[["group", "variant", "policy", "mean_pr_auc", "n_retrains", "pr_auc_gain_pct", "cost_saving_pct"]]
+        s.append(md_table(t.round(3), floatfmt="{:.3f}"))
+        tr = load_csv("tuning_trials.csv")
+        if tr is not None:
+            d = tr[tr.is_default].iloc[0]
+            b = tr.iloc[0]
+            s.append(nl + f"Hyper-parameter search ({len(tr) - 1} random trials + default, time-ordered validation on the last 2 training weeks): "
+                     f"default validation PR-AUC {d.val_pr_auc:.4f}, best {b.val_pr_auc:.4f}." + nl + nl)
+        s.append(fig(readme_dir, "extra_experiments", "Sensitivity of results to class weighting, tuning and window length"))
+
 
     body = "".join(s)
     nl = chr(10)
