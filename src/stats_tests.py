@@ -57,8 +57,19 @@ def main():
     config.ensure_dirs()
     rng = np.random.default_rng(config.SEED)
     pc = pd.read_csv(config.RESULTS_DIR / "policy_comparison.csv")
-    main_tab = pc[pc.label_delay_days == 0]
-    names = [p for p in main_tab.policy if p != "no_retrain"]
+    main_tab = pc[pc.label_delay_days == 0].copy()
+    main_tab["retrain_windows"] = main_tab["retrain_windows"].fillna("").astype(str)
+    names, seen, excluded = [], {}, {}
+    for _, r in main_tab.iterrows():
+        if r.policy == "no_retrain":
+            continue
+        if r.n_retrains == 0:
+            excluded[r.policy] = "never triggered, identical to no_retrain"
+        elif r.retrain_windows in seen:
+            excluded[r.policy] = f"identical retrain weeks to {seen[r.retrain_windows]}"
+        else:
+            seen[r.retrain_windows] = r.policy
+            names.append(r.policy)
 
     rows = []
     for n in names:
@@ -70,7 +81,7 @@ def main():
     vs_base["significant_holm_5pct"] = vs_base["wilcoxon_p_holm"] < 0.05
     vs_base.to_csv(config.RESULTS_DIR / "policy_stats_vs_no_retrain.csv", index=False)
 
-    mt = main_tab.set_index("policy")
+    mt = main_tab.set_index("policy").loc[names]
     fixed = [p for p in mt.index if p.startswith("fixed_") and "delay" not in p and "sliding" not in p]
     triggered = [p for p in mt.index if p.startswith(("drift_", "hybrid_"))]
     pair_rows = []
@@ -98,7 +109,10 @@ def main():
     ax.set_title("Policy gains with uncertainty (blue fixed, green drift-triggered)")
     viz.save(fig, "policy_forest")
 
-    summary = dict(n_boot=N_BOOT, block=BLOCK,
+    window_mode = None
+    if {"fixed_4w", "fixed_4w_sliding"} <= set(main_tab.policy):
+        window_mode = compare("fixed_4w_sliding", "fixed_4w", rng)
+    summary = dict(n_boot=N_BOOT, block=BLOCK, excluded_policies=excluded, sliding_vs_expanding_fixed_4w=window_mode,
                    all_significant_after_holm=bool(vs_base["significant_holm_5pct"].all()),
                    n_policies=int(len(vs_base)),
                    n_significant=int(vs_base["significant_holm_5pct"].sum()),

@@ -1,0 +1,15 @@
+data/
+data_synthetic/
+.git/
+.github/
+__pycache__/
+*.pyc
+.pytest_cache/
+mlruns/
+mlflow.db
+ignore/
+paper/
+docs/
+tests/
+src/
+Data_Science_Course_Project_Proposal_Format_Third_Year.pdf
