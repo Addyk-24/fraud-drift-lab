@@ -67,7 +67,7 @@ if dq is None:
 if dq.get("data_source") == "synthetic":
     st.warning("Showing SYNTHETIC smoke-test results - not IEEE-CIS. Do not present these numbers.")
 
-PAGES = ["🏠 Overview", "📊 Data & EDA", "▶️ Live replay", "🌊 Drift", "🔁 Policies & cost", "🔍 Explainability", "🧭 Method"]
+PAGES = ["🏠 Overview", "📈 Mid-Sem → End-Sem", "📊 Data & EDA", "▶️ Live replay", "🌊 Drift", "🔁 Policies & cost", "🔍 Explainability", "🧭 Method"]
 page = st.sidebar.radio("Navigate", PAGES)
 st.sidebar.markdown("---")
 st.sidebar.caption("MLOps-Integrated Fraud Detection with Drift-Aware Retraining\n\nMD3135 Data Science · Team lead: Aditya Katkar")
@@ -123,6 +123,80 @@ if page == PAGES[0]:
     show_fig("decay_curve", "The never-retrained model over deployment weeks")
 
 elif page == PAGES[1]:
+    st.title("📈 From Mid-Sem to End-Sem")
+    st.markdown("**Mid-Sem asked:** does a deployed fraud model decay, and can we see it coming?  \n"
+                "**End-Sem asks:** what should we do about it, and is it worth the cost?")
+    pc = csv("policy_comparison.csv")
+    mid_figs = ["eda_class_balance", "eda_fraud_over_time", "eda_fraud_by_category", "eda_pattern_shift", "eda_amount",
+                "eda_amount_over_time", "eda_missingness", "eda_hourly", "eda_target_correlation", "decay_curve",
+                "decay_curve_fixed_4w", "evaluation_protocols", "top_features", "imbalance_ablation", "drift_detection",
+                "psi_heatmap", "adversarial_drift"]
+    end_figs = ["policy_timeline", "policy_tradeoff", "cost_sensitivity", "policy_forest", "shap_global_top15",
+                "shap_weekly_heatmap", "shap_beeswarm_late", "extra_experiments"]
+    n_mid = sum((FIG / f"{n}.png").exists() for n in mid_figs)
+    n_end = sum((FIG / f"{n}.png").exists() for n in end_figs)
+    tests_file = ROOT / "tests" / "test_pipeline.py"
+    n_tests = tests_file.read_text(encoding="utf-8").count("def test_") if tests_file.exists() else 11
+    c = st.columns(5)
+    kpi(c[0], "Retraining policies compared", f"2 → {len(pc) if pc is not None else '-'}")
+    kpi(c[1], "Figures", f"{n_mid} → {n_mid + n_end}")
+    kpi(c[2], "Research questions answered", "1 → 4", "Mid-Sem: RQ1 and an early look at RQ2. End-Sem: RQ1-RQ4")
+    kpi(c[3], "Robustness checks", "1 → 5", "Imbalance ablation; then no class weights, tuned parameters, 14-day windows, label delay")
+    kpi(c[4], "Automated tests", f"0 → {n_tests}")
+
+    st.subheader("What was added")
+    st.dataframe(pd.DataFrame([
+        ("Data", "IEEE-CIS cleaned and explored", "Unchanged, so all numbers stay comparable"),
+        ("Question", "Does a never-retrained model decay?", "Which retraining policy, at what cost?"),
+        ("Policies", "Never retrain, fixed 4-weekly (preview)", "18: fixed, ADWIN, DDM, PR-AUC rule, hybrid, PSI, sliding, delay"),
+        ("Drift", "ADWIN/DDM alarms, PSI, adversarial AUC", "Detectors turned into retraining triggers; label-free PSI trigger"),
+        ("Cost", "-", "Fraud loss + review + retraining, break-even retraining cost, sensitivity heat-map"),
+        ("Statistics", "Spearman trend of the decay", "Block-bootstrap intervals, Holm-corrected tests, budget-matched comparisons"),
+        ("Explainability", "Gain importance", "Exact TreeSHAP, early vs late weeks"),
+        ("Robustness", "Imbalance ablation", "Class weights, tuned hyper-parameters, 14-day windows, 7/14-day label delay"),
+        ("Engineering", "Scripts, README generator", "Dashboard, tests, CI, Docker, MLflow tracking"),
+        ("Paper", "Skeleton and RQ1", "Complete draft with RQ1-RQ4, discussion and threats"),
+    ], columns=["Area", "Mid-Sem", "End-Sem"]), hide_index=True, width="stretch")
+
+    st.subheader("How the answers evolved")
+    rows = []
+    if base:
+        d = base["policies"]["no_retrain"]["decay"]["pr_auc"]
+        best = pc.sort_values("mean_pr_auc", ascending=False).iloc[0] if pc is not None else None
+        rows.append(("RQ1 Decay", f"PR-AUC falls {d['relative_drop_pct']:.1f}% over the deployment weeks (Spearman p={d['spearman_p']:.3f})",
+                     f"...and retraining recovers it: best policy {best.policy} is {best.pr_auc_gain_vs_no_retrain_pct:+.1f}% vs never retraining"
+                     if best is not None else "-"))
+    if drift:
+        mb = csv("policy_stats_matched_budget.csv")
+        spans = f"{int(((mb.ci_low <= 0) & (mb.ci_high >= 0)).sum())} of {len(mb)}" if mb is not None and len(mb) else "-"
+        rows.append(("RQ2 Detection",
+                     f"Detectors fire early; adversarial AUC {drift['adversarial_auc']['first_deployment_week']:.2f} → {drift['adversarial_auc']['last_deployment_week']:.2f}",
+                     f"As triggers they match fixed intervals (CI spans 0 in {spans} pairs)"))
+    if pc is not None:
+        fx = pc[pc.policy == "fixed_4w"].iloc[0]
+        rows.append(("RQ3 Policy and cost", f"Fixed 4-weekly previewed: {fx.pr_auc_gain_vs_no_retrain_pct:+.1f}% PR-AUC",
+                     f"{len(pc)} policies; all significant after Holm correction; break-even retraining cost at least ${pc[pc.label_delay_days == 0].break_even_retrain_cost.min():,.0f}"))
+    if shap_sum:
+        rows.append(("RQ4 Features", "Gain importance of the baseline",
+                     f"Exact SHAP: early vs late rank correlation {shap_sum['spearman_rank_corr_early_vs_late']:.2f}; only browser/OS strings lose rank"))
+    st.dataframe(pd.DataFrame(rows, columns=["Question", "Mid-Sem finding", "End-Sem finding"]), hide_index=True, width="stretch")
+
+    st.subheader("Side by side")
+    pairs = {
+        "Decay → Policies": ("decay_curve", "Mid-Sem: the never-retrained model decays", "policy_timeline", "End-Sem: policies compared on the same weeks"),
+        "Detection → Evidence": ("drift_detection", "Mid-Sem: detector alarms vs degradation", "policy_forest", "End-Sem: policy gains with confidence intervals"),
+        "Importance → SHAP": ("top_features", "Mid-Sem: gain importance", "shap_global_top15", "End-Sem: SHAP early vs late"),
+        "Protocols → Robustness": ("evaluation_protocols", "Mid-Sem: static vs deployment evaluation", "extra_experiments", "End-Sem: other design choices"),
+    }
+    for tab, (key, (fl, cl, fr, cr)) in zip(st.tabs(list(pairs)), pairs.items()):
+        with tab:
+            a, b = st.columns(2)
+            with a:
+                show_fig(fl, cl)
+            with b:
+                show_fig(fr, cr)
+
+elif page == PAGES[2]:
     st.title("📊 Data & exploratory analysis")
     c = st.columns(4)
     kpi(c[0], "Rows × columns", f"{dq['final_shape'][0]:,} × {dq['final_shape'][1]}")
@@ -153,7 +227,7 @@ elif page == PAGES[1]:
         st.caption("Trained on the initial window, scored on every later week. On this data plain training was not worse than "
                    "class weighting or SMOTE — worth stating honestly in the paper.")
 
-elif page == PAGES[2]:
+elif page == PAGES[3]:
     st.title("▶️ Live replay of deployment")
     st.caption("Press play to watch the model face one new week of transactions at a time — exactly as it would in production.")
     pols = policies()
@@ -222,7 +296,7 @@ elif page == PAGES[2]:
     else:
         render(week, "static")
 
-elif page == PAGES[3]:
+elif page == PAGES[4]:
     st.title("🌊 Drift: is the world changing under the model?")
     if drift:
         c = st.columns(4)
@@ -269,7 +343,7 @@ elif page == PAGES[3]:
             st.caption("A classifier is trained to tell the reference period from week *w*. AUC→1 means the incoming data no longer "
                        "looks like the training data (covariate drift).")
 
-elif page == PAGES[4]:
+elif page == PAGES[5]:
     st.title("🔁 Retraining policies and their cost")
     pc = csv("policy_comparison.csv")
     if pc is None:
@@ -341,7 +415,7 @@ elif page == PAGES[4]:
                      hide_index=True, width="stretch")
         st.caption("Real fraud labels arrive days or weeks late (chargebacks). Longer delay means the retrained model is trained on older data.")
 
-elif page == PAGES[5]:
+elif page == PAGES[6]:
     st.title("🔍 Explainability (TreeSHAP)")
     tab = csv("tables/shap_early_vs_late.csv", index_col=0)
     byweek = csv("tables/shap_mean_abs_by_week.csv", index_col=0)
