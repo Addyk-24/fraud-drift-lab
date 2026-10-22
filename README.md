@@ -83,7 +83,7 @@ python run_midsem.py --steps policies explain readme
 
 streamlit run app/dashboard.py       # the visual demo (works from the committed results/ folder)
 python -m pytest tests -q            # leakage guards and end-to-end checks on small synthetic data
-mlflow ui --backend-store-uri ./mlruns   # experiment tracking (policy runs are logged automatically if mlflow is installed)
+mlflow ui --backend-store-uri sqlite:///mlflow.db   # experiment tracking (policy runs are logged automatically if mlflow is installed)
 docker build -t fraud-drift-lab . && docker run -p 8501:8501 fraud-drift-lab   # dashboard in a container
 ```
 
@@ -257,6 +257,13 @@ Cost = fraud_loss_rate x missed fraud amount + review cost x flagged + retrain c
 | drift_perf_drop | 0 | 2 | 0.518 | 10.276 | 0.002 | 0.421 | 127.300 | 1463290.312 | 12.178 | 101953.406 |
 | fixed_4w_delay7d | 7 | 4 | 0.516 | 9.680 | 0.001 | 0.422 | 190.200 | 1494992.875 | 10.275 | 43301.062 |
 | fixed_4w_delay14d | 14 | 4 | 0.496 | 5.582 | 0.060 | 0.404 | 192.600 | 1599110.500 | 4.026 | 17271.656 |
+| fixed_4w_sliding | 0 | 4 | 0.530 | 12.853 | 0.001 | 0.444 | 104.700 | 1440717.562 | 13.533 | 56869.891 |
+| drift_adwin_cd4 | 0 | 2 | 0.513 | 9.096 | 0.005 | 0.419 | 132.500 | 1443382.000 | 13.373 | 111907.562 |
+| hybrid_adwin_max8 | 0 | 4 | 0.534 | 13.532 | 0.000 | 0.434 | 1351.500 | 1415778.125 | 15.029 | 63104.750 |
+| hybrid_ddm_miss_max8 | 0 | 3 | 0.523 | 11.204 | 0.000 | 0.425 | 186.600 | 1486235.375 | 10.801 | 60487.250 |
+| drift_psi3 | 0 | 1 | 0.501 | 6.618 | 0.018 | 0.409 | 68.000 | 1523132.188 | 8.586 | 143564.938 |
+| drift_psi5 | 0 | 0 | 0.470 | 0.000 | nan | 0.389 | 32.100 | 1666197.125 | 0.000 | nan |
+| drift_psi8 | 0 | 0 | 0.470 | 0.000 | nan | 0.389 | 61.300 | 1666197.125 | 0.000 | nan |
 
 Best PR-AUC: **fixed_2w** · cheapest at defaults: **fixed_2w** · best drift-triggered: **drift_adwin**
 
@@ -291,25 +298,52 @@ Mean weekly PR-AUC gain over never retraining with a 95% moving-block bootstrap 
 
 | policy | n_retrains | mean_diff | ci_low | ci_high | weeks_better | n_weeks | wilcoxon_p_holm |
 |---|---|---|---|---|---|---|---|
-| fixed_2w | 8 | 0.0763 | 0.0581 | 0.1046 | 16 | 18 | 0.0035 |
-| fixed_4w | 4 | 0.0603 | 0.0350 | 0.0888 | 14 | 18 | 0.0049 |
-| fixed_8w | 2 | 0.0414 | 0.0123 | 0.0707 | 10 | 18 | 0.0101 |
-| drift_adwin_miss | 1 | 0.0269 | 0.0165 | 0.0425 | 14 | 18 | 0.0049 |
-| drift_ddm_miss | 3 | 0.0527 | 0.0424 | 0.0712 | 16 | 18 | 0.0035 |
-| drift_adwin | 4 | 0.0636 | 0.0421 | 0.0941 | 16 | 18 | 0.0035 |
-| drift_ddm | 4 | 0.0495 | 0.0117 | 0.0909 | 9 | 18 | 0.0101 |
-| drift_perf_drop | 2 | 0.0483 | 0.0214 | 0.0810 | 12 | 18 | 0.0067 |
+| fixed_2w | 8 | 0.0763 | 0.0581 | 0.1046 | 16 | 18 | 0.0044 |
+| fixed_4w | 4 | 0.0603 | 0.0350 | 0.0888 | 14 | 18 | 0.0069 |
+| fixed_8w | 2 | 0.0414 | 0.0123 | 0.0707 | 10 | 18 | 0.0202 |
+| drift_adwin_miss | 1 | 0.0269 | 0.0165 | 0.0425 | 14 | 18 | 0.0069 |
+| drift_ddm_miss | 3 | 0.0527 | 0.0424 | 0.0712 | 16 | 18 | 0.0044 |
+| drift_adwin | 4 | 0.0636 | 0.0421 | 0.0941 | 16 | 18 | 0.0044 |
+| drift_ddm | 4 | 0.0495 | 0.0117 | 0.0909 | 9 | 18 | 0.0202 |
+| drift_perf_drop | 2 | 0.0483 | 0.0214 | 0.0810 | 12 | 18 | 0.0111 |
+| drift_adwin_cd4 | 2 | 0.0428 | 0.0130 | 0.0733 | 10 | 18 | 0.0202 |
+| drift_psi3 | 1 | 0.0311 | 0.0000 | 0.0644 | 7 | 18 | 0.0202 |
 
 **Budget-matched: drift-triggered vs fixed interval with the same number of retrainings**
 
 | triggered | fixed | n_retrains | mean_diff | ci_low | ci_high | wilcoxon_p_holm |
 |---|---|---|---|---|---|---|
-| drift_adwin | fixed_4w | 4 | 0.0033 | -0.0114 | 0.0216 | 0.9721 |
-| drift_ddm | fixed_4w | 4 | -0.0108 | -0.0345 | 0.0076 | 0.5470 |
-| drift_perf_drop | fixed_8w | 2 | 0.0069 | -0.0087 | 0.0284 | 0.9604 |
+| drift_adwin | fixed_4w | 4 | 0.0033 | -0.0110 | 0.0214 | 1.0000 |
+| drift_ddm | fixed_4w | 4 | -0.0108 | -0.0352 | 0.0080 | 0.7294 |
+| drift_perf_drop | fixed_8w | 2 | 0.0069 | -0.0083 | 0.0278 | 1.0000 |
+| drift_adwin_cd4 | fixed_8w | 2 | 0.0013 | 0.0000 | 0.0078 | 1.0000 |
 
 ![Policy gains with uncertainty](results/figures/policy_forest.png)
 *Policy gains with uncertainty*
+
+### 9. Sensitivity experiments
+
+| group | variant | policy | mean_pr_auc | n_retrains | pr_auc_gain_pct | cost_saving_pct |
+|---|---|---|---|---|---|---|
+| class_weight | with weights (default) | no_retrain | 0.470 | 0 | 0.000 | 0.000 |
+| class_weight | with weights (default) | fixed 4 wk | 0.530 | 4 | 12.836 | 15.966 |
+| class_weight | no weights | no_retrain | 0.498 | 0 | 0.000 | 0.000 |
+| class_weight | no weights | fixed 4 wk | 0.565 | 4 | 13.562 | 16.656 |
+| tuning | default params | no_retrain | 0.470 | 0 | 0.000 | 0.000 |
+| tuning | default params | fixed 4 wk | 0.530 | 4 | 12.836 | 15.966 |
+| tuning | tuned params | no_retrain | 0.488 | 0 | 0.000 | 0.000 |
+| tuning | tuned params | fixed 4 wk | 0.561 | 4 | 15.002 | 12.090 |
+| window | 7-day windows (default) | no_retrain | 0.470 | 0 | 0.000 | 0.000 |
+| window | 7-day windows (default) | fixed 4 wk | 0.530 | 4 | 12.836 | 15.966 |
+| window | 7-day windows (default) | adwin | 0.534 | 4 | 13.532 | 15.029 |
+| window | 14-day windows | no_retrain | 0.460 | 0 | 0.000 | 0.000 |
+| window | 14-day windows | fixed 4 wk | 0.515 | 4 | 11.980 | 10.596 |
+| window | 14-day windows | adwin | 0.515 | 4 | 11.980 | 10.596 |
+
+Hyper-parameter search (8 random trials + default, time-ordered validation on the last 2 training weeks): default validation PR-AUC 0.5988, best 0.6501.
+
+![Sensitivity of results to class weighting, tuning and window length](results/figures/extra_experiments.png)
+*Sensitivity of results to class weighting, tuning and window length*
 
 
 <!-- RESULTS:END -->
@@ -320,22 +354,23 @@ Mean weekly PR-AUC gain over never retraining with a 95% moving-block bootstrap 
 
 | Item | Owner | Mid-Sem | End-Sem |
 |---|---|---|---|
-| Data download, merge, cleaning, quality report | Member 2 | done | CI, reproducibility docs |
-| EDA + feature-shift plots | Member 3 | done | - |
-| Encoding, feature selection, imbalance ablation, literature | Member 4 | done (literature review in progress) | hyper-parameter search + sensitivity runs coded (`src/experiments.py`), need real-data run; literature table |
+| Data download, merge, cleaning, quality report | Nikhil Kardile | done | CI, reproducibility docs |
+| EDA + feature-shift plots | Kartik Mandane | done | - |
+| Encoding, feature selection, imbalance ablation, literature | Om karkele | done (literature review in progress) | hyper-parameter search and sensitivity runs done; literature comparison table still to write |
 | Chronological simulator, baseline, no-retrain decay | Aditya | done | - |
 | Preliminary ADWIN/DDM + PSI + adversarial drift | Aditya | done | - |
-| Drift-triggered, hybrid and covariate (PSI) retraining policies, sliding window | Aditya | - | code + tests done; 11 policies run on real data, 7 new variants pending data re-download |
-| Cost model, break-even retrain cost, label-delay sensitivity, bootstrap CIs, budget-matched tests | Aditya | - | done (`src/cost.py`, `src/stats_tests.py`) |
-| TreeSHAP explainability (early vs late, per week) | Member 3 | - | done; interpretation written in paper |
-| Dashboard, tests (11), CI, Docker, MLflow logging | Aditya + Member 2 | dashboard ready | first CI run on GitHub, share dashboard |
-| Research paper | all (see `paper/`) | intro, related work, method, RQ1 | full draft incl. RQ1-RQ4, discussion, threats, conclusion; 8 TODO markers left (see paper/main.tex) |
+| Drift-triggered, hybrid and covariate (PSI) retraining policies, sliding window | Aditya | - | done: 18 policies run on real data |
+| Cost model, break-even retrain cost, label-delay sensitivity, bootstrap CIs, budget-matched tests | Om Karkele | - | done (`src/cost.py`, `src/stats_tests.py`) |
+| TreeSHAP explainability (early vs late, per week) | Om karkele | - | done; interpretation written in paper |
+| Dashboard, tests (11), CI, Docker, MLflow logging | Aditya + Kartik Mandane | dashboard ready | MLflow now on SQLite and logging; Docker image build and first GitHub CI run still to verify |
+| Research paper | Om Karkele + Nikhil Kardile (see `paper/`) | intro, related work, method, RQ1 | complete draft with real results; 2 TODO markers left (institute name, literature gap check); needs LaTeX compile on Overleaf |
 
 ## 6. Changelog
 
 Keep this list updated: **one line per meaningful change, newest first.** Figures and numbers are refreshed automatically above.
 
-- **2026-10-12** - End-Sem work: new policies (`HybridDrift` with maximum model age, label-free `CovariateDrift` on PSI of the top-20 features against the last four training weeks, sliding-window mode, longer cool-down), no-class-weight / tuned-parameter / 14-day-window sensitivity runs and random-search tuning with time-ordered validation (`src/experiments.py`), moving-block bootstrap CIs, Holm-corrected paired tests and budget-matched comparisons (`src/stats_tests.py`; result: all 8 policies beat never retraining, drift-triggered vs fixed at equal retrain count not distinguishable, every CI spans 0), dashboard sections for these, 4 new tests (11 total), paper sections completed. **Blocked:** `data/raw/train_identity.csv` and the cleaned Parquet were deleted from the working folder, so the 7 new policy runs and the sensitivity experiments have not been run on real data yet.
+- **2026-10-12 (later)** - End-Sem experiments run on the real data (data re-downloaded and re-cleaned, identical to the Mid-Sem dataset): 18 policies, hyper-parameter search (best: 255 leaves, lr 0.1, 400 trees; validation PR-AUC 0.599 -> 0.650), sensitivity runs. Findings: all 10 distinct policies beat never retraining after Holm correction (p<=0.021); drift-triggered vs fixed at equal retrain count not distinguishable (all CIs span 0); hybrid policies identical to their base (age cap never reached); sliding window == expanding window (diff +0.0001, CI +-0.008), so the gain is recency; PSI-triggered policy fired once (k=3) or never (k=5,8); dropping class weights raises PR-AUC about 6%; tuned parameters raise PR-AUC (+3.8% never, +5.8% 4-weekly) but not total cost; at 14-day windows ADWIN equals fixed retraining. MLflow moved to a SQLite backend (the file store is rejected by current MLflow) and tracking errors no longer abort a run. Paper results sections completed.
+- **2026-10-12** - End-Sem work: new policies (`HybridDrift` with maximum model age, label-free `CovariateDrift` on PSI of the top-20 features against the last four training weeks, sliding-window mode, longer cool-down), no-class-weight / tuned-parameter / 14-day-window sensitivity runs and random-search tuning with time-ordered validation (`src/experiments.py`), moving-block bootstrap CIs, Holm-corrected paired tests and budget-matched comparisons (`src/stats_tests.py`; result: all 8 policies beat never retraining, drift-triggered vs fixed at equal retrain count not distinguishable, every CI spans 0), dashboard sections for these, 4 new tests (11 total), paper sections completed.
 - **2026-10-01** - Policy comparison and TreeSHAP run on real data (11 policies incl. label delay 7/14 days); paper RQ2-RQ4 results written. Findings: every retraining policy beats never retraining (PR-AUC +5.7% to +16.2%, paired Wilcoxon p<=0.008 except 14-day delay p=0.060); fixed 2-weekly is best and cheapest; drift-triggered policies only match fixed intervals at similar retrain counts (hypothesis H2 not supported); break-even retrain cost >= $17k vs assumed $500; SHAP ranking stable (rho=0.995) except browser/OS strings id_31/id_30. Docstrings and comments removed from all code (AST-verified identical); tests (7) and dashboard pages re-verified.
 - **2026-09-30 (later)** - End-Sem core pulled forward: `DriftTriggered` policy (increase-only ADWIN/DDM on error or fraud-miss streams, cool-down, detector reset after retrain, PR-AUC-drop rule), cost model with assumption-free break-even retrain cost, policy comparison with paired Wilcoxon tests and label-delay sensitivity, exact TreeSHAP early-vs-late analysis, Streamlit dashboard (live replay, drift, policies and cost calculator, explainability), 7 pytest guards (leakage, schedules, cost, end-to-end), GitHub Actions CI, Dockerfile, optional MLflow tracking. First real-data run: static split overstates PR-AUC vs deploy-once, never-retrained PR-AUC falls 13.7% (Spearman rho -0.49, p=0.039), adversarial AUC rises 0.77 -> 0.97.
 - **2026-09-30** - Mid-Sem code base created: Kaggle loader, cleaning pipeline, 9 EDA figures, time-safe feature selection, chronological

@@ -41,3 +41,21 @@ Do NOT re-run the pipeline in front of the professor; it takes minutes. The dash
 - Retraining pays for itself: break-even cost per retrain is at least $17k against an assumed $500.
 - Label delay hurts: fixed 4-weekly PR-AUC 0.530 -> 0.516 (7 days) -> 0.496 (14 days).
 - SHAP: same features matter early and late (rank corr 0.995); browser/OS strings lose importance.
+
+## Additions from the final experiments (real run)
+- 18 policies were compared. Best: fixed 2-weekly (PR-AUC 0.546, +16%). Drift-triggered ADWIN reaches 0.534 with 4 retrains; at equal retrain count it is not distinguishable from fixed 4-weekly (CI -0.011 to +0.021).
+- Sliding vs expanding window: identical (0.5305 vs 0.5304). Say: "the benefit comes from recency, not from having more data".
+- Hybrid policy (detector plus maximum model age 8 weeks) never differed from its base policy because detectors always fired first. Be ready to say this is a negative result.
+- PSI-triggered (label-free) retraining fired once at k=3 and never at k=5 or 8, although the inputs drift strongly.
+- Without class weights PR-AUC is about 6% higher; tuned parameters help PR-AUC (+3.8% / +5.8%) but did not lower total cost at the single F1 threshold.
+- Likely question: "Why does ADWIN equal fixed retraining at 14-day windows?" Answer: it fires every time its two-window cool-down allows, i.e. it behaves like a fixed schedule on this data.
+
+## Showing progress from Mid-Sem to End-Sem
+Open the dashboard page **Mid-Sem → End-Sem** (second in the sidebar). It shows, in order: the counters (policies 2 → 18, figures 17 → 25, research questions 1 → 4, tests 0 → 11), a table of what was added per area, how each research question's answer evolved, and four side-by-side figure pairs (decay → policies, detector alarms → confidence intervals, gain importance → SHAP, protocols → robustness). Suggested line: "Mid-Sem showed the problem; End-Sem answers what to do about it and whether it is worth the cost."
+
+## Running the demo in Docker (optional)
+Terminal (`streamlit run app/dashboard.py`) is enough for the review. Docker only matters if you want to run the same demo on another machine without installing Python.
+1. Start Docker Desktop and wait until it says the engine is running.
+2. `docker build -t fraud-drift-lab .` (first build downloads the Python image; a few minutes)
+3. `docker run --rm -p 8501:8501 fraud-drift-lab`
+4. Open http://localhost:8501
