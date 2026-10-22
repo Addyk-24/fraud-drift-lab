@@ -1,0 +1,13 @@
+{
+ "group": "window",
+ "variant": "14-day windows",
+ "policy": "adwin",
+ "spec": "drift:adwin",
+ "mean_pr_auc": 0.5153286862683024,
+ "mean_roc_auc": 0.8926164869665283,
+ "mean_recall_at_1pct_fpr": 0.423664921362611,
+ "n_retrains": 4,
+ "train_seconds": 193.23095607757568,
+ "total_cost": 1504898.5625,
+ "n_weeks": 9
+}

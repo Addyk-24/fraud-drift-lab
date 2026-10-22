@@ -1,0 +1,13 @@
+{
+ "group": "tuning",
+ "variant": "tuned params",
+ "policy": "fixed 4 wk",
+ "spec": "fixed:4",
+ "mean_pr_auc": 0.5610355611277732,
+ "mean_roc_auc": 0.90289367959223,
+ "mean_recall_at_1pct_fpr": 0.47225863974073,
+ "n_retrains": 4,
+ "train_seconds": 13049.204668283463,
+ "total_cost": 1421442.625,
+ "n_weeks": 18
+}

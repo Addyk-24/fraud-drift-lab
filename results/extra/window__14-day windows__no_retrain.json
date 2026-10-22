@@ -1,0 +1,13 @@
+{
+ "group": "window",
+ "variant": "14-day windows",
+ "policy": "no_retrain",
+ "spec": "no_retrain",
+ "mean_pr_auc": 0.4601960297656644,
+ "mean_roc_auc": 0.8505286030922191,
+ "mean_recall_at_1pct_fpr": 0.3865806232761887,
+ "n_retrains": 0,
+ "train_seconds": 26.774068593978882,
+ "total_cost": 1683263.75,
+ "n_weeks": 9
+}

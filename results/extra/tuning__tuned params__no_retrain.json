@@ -1,0 +1,13 @@
+{
+ "group": "tuning",
+ "variant": "tuned params",
+ "policy": "no_retrain",
+ "spec": "no_retrain",
+ "mean_pr_auc": 0.48784832235358533,
+ "mean_roc_auc": 0.864513731170972,
+ "mean_recall_at_1pct_fpr": 0.40537689547376177,
+ "n_retrains": 0,
+ "train_seconds": 51.89729905128479,
+ "total_cost": 1616930.125,
+ "n_weeks": 18
+}

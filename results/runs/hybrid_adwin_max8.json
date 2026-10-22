@@ -1,0 +1,20 @@
+{
+ "policy": "hybrid_adwin_max8",
+ "n_retrains": 4,
+ "retrain_windows": [
+  10,
+  16,
+  19,
+  23
+ ],
+ "total_train_seconds": 1351.478187084198,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  9,
+  15,
+  18,
+  22
+ ],
+ "spec": "hybrid:adwin:8"
+}

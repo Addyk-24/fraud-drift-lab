@@ -1,0 +1,18 @@
+{
+ "policy": "hybrid_ddm_miss_max8",
+ "n_retrains": 3,
+ "retrain_windows": [
+  10,
+  13,
+  20
+ ],
+ "total_train_seconds": 186.56506896018982,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  9,
+  12,
+  19
+ ],
+ "spec": "hybrid:ddm_miss:8"
+}

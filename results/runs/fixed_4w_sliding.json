@@ -1,0 +1,15 @@
+{
+ "policy": "fixed_4w_sliding",
+ "n_retrains": 4,
+ "retrain_windows": [
+  12,
+  16,
+  20,
+  24
+ ],
+ "total_train_seconds": 104.70260572433472,
+ "label_delay_days": 0,
+ "train_mode": "sliding",
+ "trigger_windows": [],
+ "spec": "fixed:4#sliding"
+}

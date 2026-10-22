@@ -1,0 +1,13 @@
+{
+ "group": "class_weight",
+ "variant": "no weights",
+ "policy": "no_retrain",
+ "spec": "no_retrain",
+ "mean_pr_auc": 0.49789977278292,
+ "mean_roc_auc": 0.8761044044231041,
+ "mean_recall_at_1pct_fpr": 0.41671424709887206,
+ "n_retrains": 0,
+ "train_seconds": 34.055318117141724,
+ "total_cost": 1642322.3125,
+ "n_weeks": 18
+}

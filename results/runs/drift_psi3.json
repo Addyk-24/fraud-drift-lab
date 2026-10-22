@@ -1,0 +1,14 @@
+{
+ "policy": "drift_psi3",
+ "n_retrains": 1,
+ "retrain_windows": [
+  19
+ ],
+ "total_train_seconds": 68.04057669639587,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  18
+ ],
+ "spec": "drift:psi3"
+}

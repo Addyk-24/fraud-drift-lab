@@ -1,45 +1,72 @@
 {
  "n_boot": 5000,
  "block": 3,
+ "excluded_policies": {
+  "fixed_4w_sliding": "identical retrain weeks to fixed_4w",
+  "hybrid_adwin_max8": "identical retrain weeks to drift_adwin",
+  "hybrid_ddm_miss_max8": "identical retrain weeks to drift_ddm_miss",
+  "drift_psi5": "never triggered, identical to no_retrain",
+  "drift_psi8": "never triggered, identical to no_retrain"
+ },
+ "sliding_vs_expanding_fixed_4w": {
+  "mean_diff": 7.804402654351055e-05,
+  "ci_low": -0.00848254474702766,
+  "ci_high": 0.007121853141853988,
+  "wilcoxon_p": 0.9249783071207602,
+  "weeks_better": 7,
+  "n_weeks": 18
+ },
  "all_significant_after_holm": true,
- "n_policies": 8,
- "n_significant": 8,
+ "n_policies": 10,
+ "n_significant": 10,
  "matched_budget_pairs": [
   {
    "mean_diff": 0.0033,
-   "ci_low": -0.0114,
-   "ci_high": 0.0216,
+   "ci_low": -0.011,
+   "ci_high": 0.0214,
    "wilcoxon_p": 0.9721,
    "weeks_better": 4,
    "n_weeks": 18,
    "triggered": "drift_adwin",
    "fixed": "fixed_4w",
    "n_retrains": 4,
-   "wilcoxon_p_holm": 0.9721
+   "wilcoxon_p_holm": 1.0
   },
   {
    "mean_diff": -0.0108,
-   "ci_low": -0.0345,
-   "ci_high": 0.0076,
+   "ci_low": -0.0352,
+   "ci_high": 0.008,
    "wilcoxon_p": 0.1823,
    "weeks_better": 5,
    "n_weeks": 18,
    "triggered": "drift_ddm",
    "fixed": "fixed_4w",
    "n_retrains": 4,
-   "wilcoxon_p_holm": 0.547
+   "wilcoxon_p_holm": 0.7294
   },
   {
    "mean_diff": 0.0069,
-   "ci_low": -0.0087,
-   "ci_high": 0.0284,
+   "ci_low": -0.0083,
+   "ci_high": 0.0278,
    "wilcoxon_p": 0.4802,
    "weeks_better": 7,
    "n_weeks": 18,
    "triggered": "drift_perf_drop",
    "fixed": "fixed_8w",
    "n_retrains": 2,
-   "wilcoxon_p_holm": 0.9604
+   "wilcoxon_p_holm": 1.0
+  },
+  {
+   "mean_diff": 0.0013,
+   "ci_low": 0.0,
+   "ci_high": 0.0078,
+   "wilcoxon_p": 1.0,
+   "weeks_better": 1,
+   "n_weeks": 18,
+   "triggered": "drift_adwin_cd4",
+   "fixed": "fixed_8w",
+   "n_retrains": 2,
+   "wilcoxon_p_holm": 1.0
   }
  ]
 }

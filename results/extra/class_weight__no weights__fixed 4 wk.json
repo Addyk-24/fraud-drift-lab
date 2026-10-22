@@ -1,0 +1,13 @@
+{
+ "group": "class_weight",
+ "variant": "no weights",
+ "policy": "fixed 4 wk",
+ "spec": "fixed:4",
+ "mean_pr_auc": 0.5654248031122188,
+ "mean_roc_auc": 0.9105499156167914,
+ "mean_recall_at_1pct_fpr": 0.46695359802570824,
+ "n_retrains": 4,
+ "train_seconds": 183.67546343803406,
+ "total_cost": 1368774.9375,
+ "n_weeks": 18
+}

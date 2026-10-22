@@ -1,0 +1,16 @@
+{
+ "policy": "drift_adwin_cd4",
+ "n_retrains": 2,
+ "retrain_windows": [
+  16,
+  23
+ ],
+ "total_train_seconds": 132.51477193832397,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [
+  15,
+  22
+ ],
+ "spec": "drift:adwin:cd4"
+}

@@ -1,0 +1,10 @@
+{
+ "policy": "drift_psi5",
+ "n_retrains": 0,
+ "retrain_windows": [],
+ "total_train_seconds": 32.05403661727905,
+ "label_delay_days": 0,
+ "train_mode": "expanding",
+ "trigger_windows": [],
+ "spec": "drift:psi5"
+}
